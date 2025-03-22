@@ -3,8 +3,8 @@ name: Build iOS IPA
 on:
   push:
     branches:
-      - main  # Runs on push to the main branch
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
+      - main
+  workflow_dispatch:
 
 jobs:
   build-ios:
@@ -14,15 +14,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Ruby and Bundler
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Node Dependencies
+        run: npm ci  # Ensures correct dependencies
+
+      - name: Debug React Native Pods File
         run: |
-          brew install ruby
-          gem install bundler:2.4.22  # Use latest stable Bundler version
+          if [ ! -f "node_modules/react-native/scripts/react_native_pods.rb" ]; then
+            echo "⚠️ react_native_pods.rb is missing! Reinstalling..."
+            rm -rf node_modules ios/Pods
+            npm ci
+            cd ios && pod install --repo-update
+          else
+            echo "✅ react_native_pods.rb found!"
+          fi
 
       - name: Install CocoaPods Dependencies
         run: |
           cd ios
-          pod install --silent --repo-update  # Faster install, updates repo
+          pod install --repo-update
 
       - name: Select Xcode Version
         run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
@@ -56,4 +70,4 @@ jobs:
         with:
           name: MyApp-ipa
           path: ios/build/MyApp.ipa
-          retention-days: 30  # Store IPA for 30 days
+          retention-days: 30
