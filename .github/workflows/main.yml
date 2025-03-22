@@ -1,36 +1,59 @@
-name: Build APK and Upload to GitHub Artifacts
+name: Build iOS IPA
 
 on:
   push:
     branches:
-      - main  # Runs on push to main branch
-  workflow_dispatch:  # Allows manual trigger
+      - main  # Runs on push to the main branch
+  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-ios:
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - name: Set up Ruby and Bundler
+        run: |
+          brew install ruby
+          gem install bundler:2.4.22  # Use latest stable Bundler version
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install CocoaPods Dependencies
+        run: |
+          cd ios
+          pod install --silent --repo-update  # Faster install, updates repo
 
-      - name: Grant Execute Permissions for Gradle
-        run: chmod +x gradlew
+      - name: Select Xcode Version
+        run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 
-      - name: Build APK
-        run: ./gradlew assembleRelease
+      - name: Build and Archive iOS App
+        run: |
+          xcodebuild clean archive \
+            -workspace ios/MyApp.xcworkspace \
+            -scheme MyApp \
+            -configuration Release \
+            -archivePath ios/build/MyApp.xcarchive \
+            CODE_SIGNING_ALLOWED=NO | xcpretty
 
-      - name: Upload APK to GitHub Artifacts
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath ios/build/MyApp.xcarchive \
+            -exportPath ios/build/ \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            CODE_SIGNING_ALLOWED=NO | xcpretty
+
+      - name: Verify IPA File
+        run: |
+          if [ ! -f "ios/build/MyApp.ipa" ]; then
+            echo "❌ IPA file was not generated!"
+            exit 1
+          fi
+
+      - name: Upload IPA to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          name: MyApp-ipa
+          path: ios/build/MyApp.ipa
+          retention-days: 30  # Store IPA for 30 days
