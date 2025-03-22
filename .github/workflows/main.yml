@@ -1,9 +1,10 @@
-name: Build APK and Upload to Repo Folder
+name: Build APK and Upload to GitHub Artifacts
 
 on:
   push:
     branches:
-      - main  # Trigger on main branch push
+      - main  # Runs on push to main branch
+  workflow_dispatch:  # Enables manual trigger
 
 jobs:
   build:
